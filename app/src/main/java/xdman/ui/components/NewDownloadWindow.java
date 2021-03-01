@@ -29,6 +29,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.Document;
 
+import com.sapher.youtubedl.YoutubeDLException;
 import xdman.Config;
 import xdman.DownloadQueue;
 import xdman.XDMApp;
@@ -101,13 +102,21 @@ public class NewDownloadWindow extends JDialog implements ActionListener, Docume
 				} else {
 					queueId = arr[1].trim();
 				}
-				createDownload(false);
-			} else if (name.equals("CLOSE")) {
+                try {
+                    createDownload(false);
+                } catch (YoutubeDLException youtubeDLException) {
+                    youtubeDLException.printStackTrace();
+                }
+            } else if (name.equals("CLOSE")) {
 				dispose();
 			} else if (name.equals("DOWNLOAD_NOW")) {
 				queueId = "";
-				createDownload(true);
-			} else if (name.equals("BTN_MORE")) {
+                try {
+                    createDownload(true);
+                } catch (YoutubeDLException youtubeDLException) {
+                    youtubeDLException.printStackTrace();
+                }
+            } else if (name.equals("BTN_MORE")) {
 				if (pop == null) {
 					createPopup();
 				}
@@ -144,7 +153,7 @@ public class NewDownloadWindow extends JDialog implements ActionListener, Docume
 		}
 	}
 
-	private void createDownload(boolean now) {
+	private void createDownload(boolean now) throws YoutubeDLException {
 		String urlStr = txtURL.getText();
 		if (urlStr.length() < 1) {
 			JOptionPane.showMessageDialog(this, StringResource.get("MSG_NO_URL"));

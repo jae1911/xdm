@@ -31,6 +31,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.border.LineBorder;
 
+import com.sapher.youtubedl.YoutubeDLException;
 import xdman.Config;
 import xdman.DownloadQueue;
 import xdman.QueueManager;
@@ -125,8 +126,12 @@ public class BatchDownloadWnd extends JFrame implements ActionListener {
 			} else if (name.equals("DOWNLOAD")) {
 				DownloadQueue queue = (DownloadQueue) cmbQueues.getSelectedItem();
 				if (queue != null) {
-					createDownload(queue);
-					if (chkStartQueue.isSelected()) {
+                    try {
+                        createDownload(queue);
+                    } catch (YoutubeDLException youtubeDLException) {
+                        youtubeDLException.printStackTrace();
+                    }
+                    if (chkStartQueue.isSelected()) {
 						queue.start();
 					}
 				}
@@ -136,7 +141,7 @@ public class BatchDownloadWnd extends JFrame implements ActionListener {
 
 	}
 
-	private void createDownload(DownloadQueue q) {
+	private void createDownload(DownloadQueue q) throws YoutubeDLException {
 		String folder = txtFile.getText();
 		for (int i = 0; i < model.size(); i++) {
 			BatchItem item = model.getElementAt(i);

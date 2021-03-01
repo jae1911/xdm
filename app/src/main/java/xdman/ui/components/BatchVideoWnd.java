@@ -24,6 +24,7 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.border.LineBorder;
 
+import com.sapher.youtubedl.YoutubeDLException;
 import xdman.Config;
 import xdman.DownloadQueue;
 import xdman.QueueManager;
@@ -250,8 +251,12 @@ public class BatchVideoWnd extends JDialog implements ActionListener {
 				txtFile.setText(jfc.getSelectedFile().getAbsolutePath());
 			}
 		} else if ("DOWNLOAD".equals(name)) {
-			download();
-			dispose();
+            try {
+                download();
+            } catch (YoutubeDLException youtubeDLException) {
+                youtubeDLException.printStackTrace();
+            }
+            dispose();
 		} else if ("CLOSE".equals(name)) {
 			dispose();
 		} else if ("QUEUE_OPTS".equals(name)) {
@@ -281,7 +286,7 @@ public class BatchVideoWnd extends JDialog implements ActionListener {
 		return StringResource.get("Q_WORD") + " " + dateFormat.format(new Date());
 	}
 
-	private void createDownload(DownloadQueue q) {
+	private void createDownload(DownloadQueue q) throws YoutubeDLException {
 		String folder = txtFile.getText();
 		for (VideoWrapper vw : this.items) {
 			String file = XDMUtils.createSafeFileName(vw.file);
@@ -291,7 +296,7 @@ public class BatchVideoWnd extends JDialog implements ActionListener {
 		}
 	}
 
-	private void download() {
+	private void download() throws YoutubeDLException {
 		int opt = cmbQueOpts.getSelectedIndex();
 
 		switch (opt) {

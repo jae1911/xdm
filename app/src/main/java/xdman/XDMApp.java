@@ -26,6 +26,10 @@ import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
+import com.sapher.youtubedl.YoutubeDL;
+import com.sapher.youtubedl.YoutubeDLException;
+import com.sapher.youtubedl.YoutubeDLRequest;
+import com.sapher.youtubedl.YoutubeDLResponse;
 import xdman.downloaders.Downloader;
 import xdman.downloaders.dash.DashDownloader;
 import xdman.downloaders.ftp.FtpDownloader;
@@ -463,8 +467,12 @@ public class XDMApp implements DownloadListener, DownloadWindowListener, Compara
 
 				if (metadata != null
 						&& (Config.getInstance().isQuietMode() || Config.getInstance().isDownloadAutoStart())) {
-					createDownload(fileName, folderPath, metadata, true, "", 0, 0);
-					return;
+                    try {
+                        createDownload(fileName, folderPath, metadata, true, "", 0, 0);
+                    } catch (YoutubeDLException e) {
+                        e.printStackTrace();
+                    }
+                    return;
 				}
 
 				new NewDownloadWindow(metadata, fileName, folderPath).setVisible(true);
@@ -523,7 +531,10 @@ public class XDMApp implements DownloadListener, DownloadWindowListener, Compara
 	}
 
 	public void createDownload(String file, String folder, HttpMetadata metadata, boolean now, String queueId,
-			int formatIndex, int streamIndex) {
+			int formatIndex, int streamIndex) throws YoutubeDLException {
+
+	    System.out.println("DEBUG:: " + metadata.getUrl());
+
 		metadata.save();
 		DownloadEntry ent = new DownloadEntry();
 		ent.setId(metadata.getId());
@@ -552,54 +563,76 @@ public class XDMApp implements DownloadListener, DownloadWindowListener, Compara
 	}
 
 	// could be new or resume
-	private void startDownload(String id, HttpMetadata metadata, DownloadEntry ent, int streams) {
+	private void startDownload(String id, HttpMetadata metadata, DownloadEntry ent, int streams) throws YoutubeDLException {
 		if (!checkAndBufferRequests(id)) {
 			Logger.log("starting " + id + " with: " + metadata + " is dash: " + (metadata instanceof DashMetadata));
 			Downloader d = null;
 
-			if (metadata instanceof DashMetadata) {
-				Logger.log("Dash download with stream: " + streams);
-				if (streams == 1) {
-					DashMetadata dm = (DashMetadata) metadata;
-					dm.setUrl(dm.getUrl2());// set video url as main url
-					dm.setUrl2(null);
-				} else if (streams == 2) {
-					DashMetadata dm = (DashMetadata) metadata;
-					dm.setUrl2(null);
-				} else {
-					Logger.log("Dash download created");
-					// create dash downloader
-					DashMetadata dm = (DashMetadata) metadata;
-					d = new DashDownloader(id, ent.getTempFolder(), dm);
-				}
-			}
-			if (metadata instanceof HlsMetadata) {
-				Logger.log("Hls download created");
-				d = new HlsDownloader(id, ent.getTempFolder(), (HlsMetadata) metadata);
-			}
-			if (metadata instanceof HdsMetadata) {
-				Logger.log("Hds download created");
-				d = new HdsDownloader(id, ent.getTempFolder(), (HdsMetadata) metadata);
-			}
-			if (d == null) {
-				if (metadata.getType() == XDMConstants.FTP) {
-					d = new FtpDownloader(id, ent.getTempFolder(), metadata);
-				} else {
-					d = new HttpDownloader(id, ent.getTempFolder(), metadata);
-				}
-			}
+			String ytPattern = "^(https?\\:\\/\\/)?(www\\.youtube\\.com|youtu\\.?be)\\/.+$";
 
-			d.setOuputMediaFormat(ent.getOutputFormatIndex());
-			downloaders.put(id, d);
-			d.registerListener(this);
-			ent.setState(XDMConstants.DOWNLOADING);
-			d.start();
+			if(metadata.getUrl().matches(ytPattern)) {
+			    System.out.println("YT URL FOUND!!!!");
 
-			if (!Config.getInstance().isQuietMode() && Config.getInstance().showDownloadWindow()) {
-				DownloadWindow wnd = new DownloadWindow(id, this);
-				downloadWindows.put(id, wnd);
-				wnd.setVisible(true);
-			}
+			    try {
+                    String dirOut = ent.getFolder() + ent.getFile();
+                    YoutubeDLRequest ytRequest = new YoutubeDLRequest(metadata.getUrl(), dirOut);
+                    ytRequest.setOption("ignore-errors");
+                    ytRequest.setOption("output", "%(id)s");
+                    ytRequest.setOption("retries", 10);
+
+                    YoutubeDLResponse ytResponse = YoutubeDL.execute(ytRequest);
+                    String stdOut = ytResponse.getOut();
+
+                    System.out.println(stdOut);
+                } catch (YoutubeDLException e) {
+			        e.printStackTrace();
+                }
+
+            } else {
+                if (metadata instanceof DashMetadata) {
+                    Logger.log("Dash download with stream: " + streams);
+                    if (streams == 1) {
+                        DashMetadata dm = (DashMetadata) metadata;
+                        dm.setUrl(dm.getUrl2());// set video url as main url
+                        dm.setUrl2(null);
+                    } else if (streams == 2) {
+                        DashMetadata dm = (DashMetadata) metadata;
+                        dm.setUrl2(null);
+                    } else {
+                        Logger.log("Dash download created");
+                        // create dash downloader
+                        DashMetadata dm = (DashMetadata) metadata;
+                        d = new DashDownloader(id, ent.getTempFolder(), dm);
+                    }
+                }
+                if (metadata instanceof HlsMetadata) {
+                    Logger.log("Hls download created");
+                    d = new HlsDownloader(id, ent.getTempFolder(), (HlsMetadata) metadata);
+                }
+                if (metadata instanceof HdsMetadata) {
+                    Logger.log("Hds download created");
+                    d = new HdsDownloader(id, ent.getTempFolder(), (HdsMetadata) metadata);
+                }
+                if (d == null) {
+                    if (metadata.getType() == XDMConstants.FTP) {
+                        d = new FtpDownloader(id, ent.getTempFolder(), metadata);
+                    } else {
+                        d = new HttpDownloader(id, ent.getTempFolder(), metadata);
+                    }
+                }
+
+                d.setOuputMediaFormat(ent.getOutputFormatIndex());
+                downloaders.put(id, d);
+                d.registerListener(this);
+                ent.setState(XDMConstants.DOWNLOADING);
+                d.start();
+
+                if (!Config.getInstance().isQuietMode() && Config.getInstance().showDownloadWindow()) {
+                    DownloadWindow wnd = new DownloadWindow(id, this);
+                    downloadWindows.put(id, wnd);
+                    wnd.setVisible(true);
+                }
+            }
 		} else {
 			Logger.log(id + ": Maximum download limit reached, queueing request");
 		}
